@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { API_ENDPOINTS } from "@/lib/apiConfig";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -96,7 +97,8 @@ export default function SignupPage() {
     if (hasError) return;
 
     try {
-      const res = await fetch("http://localhost:5000/api/auth/signup", {
+      console.log("Attempting signup at:", API_ENDPOINTS.AUTH.SIGNUP);
+      const res = await fetch(API_ENDPOINTS.AUTH.SIGNUP, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -129,8 +131,8 @@ export default function SignupPage() {
             name,
             email,
             role: "",
-          },
-        ),
+          }
+        )
       );
 
       localStorage.removeItem("isGuest");
@@ -140,7 +142,10 @@ export default function SignupPage() {
 
       router.push("/onboarding");
     } catch (error) {
-      setApiError("Something went wrong");
+      console.error("Signup Fetch Error:", error);
+      setApiError(
+        "Could not connect to the server. Please check your internet or try again later."
+      );
     }
   };
 

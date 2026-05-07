@@ -15,15 +15,30 @@ const app = express();
 connectDB();
 
 // middleware
-app.use(cors());
+app.use(cors({
+  origin: "*", // In production, you might want to specify your Vercel URL here
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
 app.use(express.json());
 
-//  add this
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
+
+// routes
 app.use("/api/auth", authRoutes);
+
+// health check
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ status: "ok", message: "Backend is running" });
+});
 
 // test route
 app.get("/", (req, res) => {
-  res.send("career intelligence ");
+  res.send("career intelligence API is active");
 });
 
 // PORT

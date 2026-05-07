@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useSkills } from "@/context/skillContext";
+import { API_ENDPOINTS } from "@/lib/apiConfig";
 
 function GuestDashboard() {
   const router = useRouter();
@@ -58,8 +59,8 @@ function GuestDashboard() {
     const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-      const res = await fetch(`${apiUrl}/api/ai-roadmap`, {
+      console.log("Guest fetching roadmap from:", API_ENDPOINTS.ROADMAP.GENERATE);
+      const res = await fetch(API_ENDPOINTS.ROADMAP.GENERATE, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role, skill }),

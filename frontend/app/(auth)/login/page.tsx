@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { API_ENDPOINTS } from "@/lib/apiConfig";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -64,7 +65,8 @@ export default function LoginPage() {
     if (Object.values(newErrors).some((e) => e !== "")) return;
 
     try {
-      const res = await fetch("http://localhost:5000/api/auth/login", {
+      console.log("Attempting login at:", API_ENDPOINTS.AUTH.LOGIN);
+      const res = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -75,7 +77,7 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setApiError(data.message || "Login failed");
+        setApiError(data.message || "Login failed. Please check your credentials.");
         return;
       }
 
@@ -98,7 +100,10 @@ export default function LoginPage() {
 
       router.push("/dashboard");
     } catch (err) {
-      setApiError("Something went wrong");
+      console.error("Login Fetch Error:", err);
+      setApiError(
+        "Could not connect to the server. Please check your internet or try again later."
+      );
     }
   };
 

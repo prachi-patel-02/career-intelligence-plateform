@@ -6,15 +6,18 @@ console.log("AUTH CONTROLLER RUNNING");
 
 // ================= SIGNUP =================
 const signup = async (req, res) => {
+  console.log("SIGNUP REQUEST RECEIVED:", req.body?.email);
   try {
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
+      console.log("Signup failed: Missing fields");
       return res.status(400).json({ message: "All fields are required" });
     }
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      console.log("Signup failed: User exists", email);
       return res.status(400).json({ message: "User already exists" });
     }
 
@@ -26,6 +29,7 @@ const signup = async (req, res) => {
       password: hashedPassword,
     });
 
+    console.log("Signup success:", email);
     res.status(201).json({
       message: "User created successfully",
       user: {
@@ -42,20 +46,24 @@ const signup = async (req, res) => {
 
 // ================= LOGIN =================
 const login = async (req, res) => {
+  console.log("LOGIN REQUEST RECEIVED:", req.body?.email);
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
+      console.log("Login failed: Missing email/password");
       return res.status(400).json({ message: "Email & password required" });
     }
 
     const user = await User.findOne({ email });
     if (!user) {
+      console.log("Login failed: User not found", email);
       return res.status(400).json({ message: "User not found" });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
+      console.log("Login failed: Invalid password", email);
       return res.status(400).json({ message: "Invalid password" });
     }
 
@@ -65,6 +73,7 @@ const login = async (req, res) => {
       { expiresIn: "1d" },
     );
 
+    console.log("Login success:", email);
     res.status(200).json({
       message: "Login successful",
       token,
@@ -83,19 +92,23 @@ const login = async (req, res) => {
 
 // ================= UPDATE ROLE =================
 const updateRole = async (req, res) => {
+  console.log("UPDATE ROLE REQUEST RECEIVED:", req.body?.userId);
   try {
     const { userId, role } = req.body;
 
     if (!userId || !role) {
+      console.log("Update role failed: Missing userId/role");
       return res.status(400).json({ message: "UserId and role required" });
     }
 
     const user = await User.findByIdAndUpdate(userId, { role }, { new: true });
 
     if (!user) {
+      console.log("Update role failed: User not found", userId);
       return res.status(404).json({ message: "User not found" });
     }
 
+    console.log("Update role success:", userId, role);
     res.status(200).json({
       message: "Role updated successfully",
       user: {
