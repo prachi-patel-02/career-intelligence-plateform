@@ -116,10 +116,10 @@ function GuestDashboard() {
           </div>
         </div>
         <button
-          onClick={() => router.push("/login")}
+          onClick={() => router.push("/signup")}
           className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white text-xs font-black rounded-xl hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-95"
         >
-          Sign In Free <ArrowRight size={13} strokeWidth={3} />
+          Sign Up Free <ArrowRight size={13} strokeWidth={3} />
         </button>
       </nav>
 
