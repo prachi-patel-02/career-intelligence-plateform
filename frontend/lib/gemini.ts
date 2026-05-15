@@ -1,79 +1,152 @@
-export async function generateRoadmap(role: string) {
+/**
+ * Extract the first valid JSON object from a string that may have
+ * trailing text, markdown fences, or other junk.
+ */
+function extractJSON(raw: string): any {
+  // Strip markdown code fences if present
+  let cleaned = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
+
+  // Try parsing directly first
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    // ignore
+  }
+
+  // Find the first { and extract balanced braces
+  const start = cleaned.indexOf("{");
+  if (start === -1) throw new Error("No JSON object found in response");
+
+  let depth = 0;
+  let end = -1;
+  for (let i = start; i < cleaned.length; i++) {
+    if (cleaned[i] === "{") depth++;
+    else if (cleaned[i] === "}") depth--;
+    if (depth === 0) {
+      end = i;
+      break;
+    }
+  }
+
+  if (end === -1) throw new Error("Unbalanced JSON braces in response");
+
+  return JSON.parse(cleaned.substring(start, end + 1));
+}
+
+export async function generateRoadmap(skillName: string, roleName: string) {
   const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
   if (!apiKey || apiKey === "your_api_key_here") {
     throw new Error("Gemini API key is missing. Please add it to your .env.local file.");
   }
 
-  const prompt = `Generate a complete step-by-step learning roadmap for becoming a ${role}. 
-Return ONLY valid JSON in this format:
+  const prompt = `You are an expert curriculum designer. Generate a professional, structured learning roadmap for "${skillName}" targeting a ${roleName}.
+
+This roadmap will be displayed as a visual infographic (like roadmap.sh). Follow ALL rules precisely.
+
+RULES:
+1. EXACTLY 4 stages: Beginner, Intermediate, Advanced, Expert
+2. EXACTLY 6-9 topics per stage (no more, no less)
+3. Each topic must be ONE specific skill atom — not a broad category
+   GOOD: "useState Hook", "JWT Authentication", "Memoization", "Database Indexing"
+   BAD: "React Fundamentals", "Advanced Concepts", "Introduction to ${skillName}"
+4. FORBIDDEN topics: "Introduction to...", "What is ${skillName}", CLI basics, OS basics, Git basics
+5. description: max 8 words, practical and specific
+6. type: use "concept" for theory/syntax, "project" for build tasks
+7. Return ONLY raw JSON — no markdown, no explanation
+
+JSON format:
 {
+  "skill": "${skillName}",
   "stages": [
     {
       "title": "Beginner",
-      "topics": [
-        {
-          "name": "HTML",
-          "subtopics": ["Tags", "Forms"],
-          "projects": ["Build a basic webpage"]
-        }
+      "items": [
+        { "id": "b1", "title": "Variables & Data Types", "type": "concept", "description": "Primitive types, declarations, and type coercion." },
+        { "id": "b2", "title": "Functions & Scope", "type": "concept", "description": "Closures, hoisting, and lexical scoping rules." }
+      ]
+    },
+    {
+      "title": "Intermediate",
+      "items": [
+        { "id": "i1", "title": "Async/Await", "type": "concept", "description": "Non-blocking code flow with promises." }
+      ]
+    },
+    {
+      "title": "Advanced",
+      "items": [
+        { "id": "a1", "title": "Memory Management", "type": "concept", "description": "Heap, stack, garbage collection patterns." }
+      ]
+    },
+    {
+      "title": "Expert",
+      "items": [
+        { "id": "e1", "title": "System Design Patterns", "type": "project", "description": "Architect scalable and maintainable systems." }
       ]
     }
   ]
-}`;
+}
 
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            response_mime_type: "application/json",
-          },
-        }),
-      }
-    );
+Now generate a complete roadmap for: ${skillName} (${roleName})
+Return ONLY the JSON object.`;
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error?.message || "Failed to call Gemini API");
-    }
+  const models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"];
 
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!text) {
-      throw new Error("Invalid response from Gemini API");
-    }
-
-    // Attempt to parse the JSON response
+  for (const model of models) {
     try {
-      return JSON.parse(text);
-    } catch (parseError) {
-      // In case Gemini returns markdown-wrapped JSON despite the generationConfig
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: prompt,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              response_mime_type: "application/json",
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        const errMsg = errorData.error?.message || "";
+        if (errMsg.includes("Quota exceeded") || errMsg.includes("quota")) {
+          console.warn(`Quota exceeded for ${model}, trying next model...`);
+          continue;
+        }
+        throw new Error(errMsg || "Failed to call Gemini API");
       }
-      throw new Error("Failed to parse roadmap data");
+
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!text) {
+        throw new Error("Invalid response from Gemini API");
+      }
+
+      return extractJSON(text);
+    } catch (error: any) {
+      if (error.message?.includes("Quota exceeded")) continue;
+      if (model === models[models.length - 1]) {
+        console.error("Error generating roadmap:", error);
+        throw error;
+      }
+      console.warn(`Model ${model} failed, trying next...`);
     }
-  } catch (error) {
-    console.error("Error generating roadmap:", error);
-    throw error;
   }
+
+  throw new Error("All Gemini models failed to generate a roadmap.");
 }
 
 /* ================= SKILL ASSESSMENT ================= */
@@ -142,10 +215,9 @@ Rules:
 - Keep questions relevant to real-world usage`;
 
   const models = [
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
-    "gemini-2.0-flash-exp",
-    "gemini-2.0-flash",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash-lite",
   ];
 
   for (const model of models) {
@@ -205,12 +277,8 @@ Rules:
         }
 
         try {
-          return JSON.parse(text) as AssessmentData;
+          return extractJSON(text) as AssessmentData;
         } catch {
-          const jsonMatch = text.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            return JSON.parse(jsonMatch[0]) as AssessmentData;
-          }
           throw new Error("Failed to parse assessment data");
         }
       } catch (error: any) {
@@ -291,7 +359,7 @@ export async function optimizeResumeBullet(bullet: string, role: string): Promis
   
   Return ONLY the optimized bullet text.`;
 
-  const models = ["gemini-1.5-flash", "gemini-pro", "gemini-1.5-pro"];
+  const models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"];
 
   for (const model of models) {
     try {
@@ -348,7 +416,7 @@ export async function checkResumeKeywords(resumeText: string, role: string): Pro
     "feedback": "Overall strong, but consider adding containerization skills."
   }`;
 
-  const models = ["gemini-1.5-flash", "gemini-pro", "gemini-1.5-pro"];
+  const models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"];
 
   for (const model of models) {
     try {
@@ -409,7 +477,7 @@ export async function generateExperienceBullets(role: string, skills: string[]):
   Return ONLY a JSON array of strings:
   ["Bullet point 1", "Bullet point 2", "Bullet point 3"]`;
 
-  const models = ["gemini-1.5-flash", "gemini-pro", "gemini-1.5-pro"];
+  const models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"];
 
   for (const model of models) {
     try {

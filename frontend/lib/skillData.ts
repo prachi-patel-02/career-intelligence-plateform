@@ -175,17 +175,41 @@ export const SKILL_ROADMAP: Record<
   },
 };
 
+/**
+ * Returns structured roadmap steps for a skill.
+ * Uses static SKILL_ROADMAP data where available.
+ * Falls back to sensible placeholder steps for unknown skills.
+ */
 export const getRoadmap = (skill: string) => {
-  return (
-    SKILL_ROADMAP[skill] || {
-      steps: [
-        {
-          stage: "Coming Soon",
-          description: "Roadmap will be added soon",
-          resource: "#",
-          resourceLabel: "Stay tuned",
-        },
-      ],
-    }
-  );
+  const found = SKILL_ROADMAP[skill];
+  if (found) return found;
+
+  return {
+    steps: [
+      {
+        stage: "Foundations",
+        description: `Core concepts and fundamentals of ${skill}.`,
+        resource: "#",
+        resourceLabel: "Learn More",
+      },
+      {
+        stage: "Intermediate",
+        description: `Build practical ${skill} skills with real examples.`,
+        resource: "#",
+        resourceLabel: "Practice",
+      },
+      {
+        stage: "Advanced",
+        description: `Deep dive into advanced ${skill} patterns and use cases.`,
+        resource: "#",
+        resourceLabel: "Advanced Guide",
+      },
+      {
+        stage: "Projects",
+        description: `Apply ${skill} in real-world projects.`,
+        resource: "#",
+        resourceLabel: "Build",
+      },
+    ],
+  };
 };

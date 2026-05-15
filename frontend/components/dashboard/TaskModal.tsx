@@ -86,7 +86,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ skillName, onClose }) => {
                 </div>
 
                 <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-sm text-gray-600">
-                  <p>Open a coding environment to solve this task, then return here to mark it as complete and earn your Bloom points!</p>
+                  <p>Open a coding environment to solve this task, then return here to mark it as complete!</p>
                 </div>
 
                 <div className="flex flex-col gap-3 pt-2">

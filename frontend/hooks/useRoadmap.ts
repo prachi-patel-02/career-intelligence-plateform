@@ -1,18 +1,21 @@
 import { useState } from 'react';
 import { generateRoadmap } from '@/lib/gemini';
 
-export interface RoadmapTopic {
-  name: string;
-  subtopics: string[];
-  projects: string[];
+export interface RoadmapItem {
+  title: string;
+  type: 'concept' | 'task' | 'project' | 'interview';
+  description: string;
+  resource?: string;
+  resumeReady?: boolean;
 }
 
 export interface RoadmapStage {
   title: string;
-  topics: RoadmapTopic[];
+  items: RoadmapItem[];
 }
 
 export interface RoadmapData {
+  skill?: string;
   stages: RoadmapStage[];
 }
 
@@ -30,7 +33,8 @@ export function useRoadmap() {
     setLoading(true);
     setError(null);
     try {
-      const data = await generateRoadmap(role);
+      // For role-level roadmaps, we use the role as the skill name too
+      const data = await generateRoadmap(role, role);
       setRoadmap(data);
     } catch (err: any) {
       setError(err.message || "Failed to generate roadmap.");

@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "@/context/authContext";
+import { apiUpdateBloom } from "@/lib/api";
 
 export type Difficulty = "easy" | "medium" | "hard";
 
@@ -52,71 +54,34 @@ export const getBloomPoints = (completedTasks: string[]): number => {
 };
 
 export const useBloomTasks = () => {
+  const { user } = useAuth();
   const [completedTasks, setCompletedTasks] = useState<string[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
 
-  // Sync user ID
+  // Hydrate from user's backend data
   useEffect(() => {
-    const getUserId = () => {
-      const userJson = localStorage.getItem("user");
-      if (userJson) {
-        try {
-          const user = JSON.parse(userJson);
-          return user.email || user._id || "unknown";
-        } catch {
-          return "unknown";
-        }
-      }
-      return localStorage.getItem("isGuest") === "true" ? "guest" : null;
-    };
-
-    setUserId(getUserId());
-  }, []);
-
-  const storageKey = userId ? `${userId}_bloomTasks` : null;
-
-  const loadTasks = useCallback(() => {
-    if (!storageKey) return;
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        setCompletedTasks(JSON.parse(stored));
-      }
-    } catch (e) {
-      console.error("Failed to load tasks", e);
+    if (user) {
+      setCompletedTasks(user.bloomTasks || []);
+    } else {
+      setCompletedTasks([]);
     }
-  }, [storageKey]);
-
-  // Load completed tasks and listen to storage events
-  useEffect(() => {
-    loadTasks();
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === storageKey) {
-        loadTasks();
-      }
-    };
-    window.addEventListener("storage", handleStorage);
-    // Custom event for same-window reactivity
-    const handleCustom = () => loadTasks();
-    window.addEventListener("bloomTasksUpdated", handleCustom);
-    
-    return () => {
-      window.removeEventListener("storage", handleStorage);
-      window.removeEventListener("bloomTasksUpdated", handleCustom);
-    };
-  }, [loadTasks, storageKey]);
+  }, [user]);
 
   const completeTask = useCallback((taskId: string) => {
-    if (!storageKey) return;
-    
     setCompletedTasks((prev) => {
       if (prev.includes(taskId)) return prev; // Cannot complete twice
       const updated = [...prev, taskId];
-      localStorage.setItem(storageKey, JSON.stringify(updated));
-      window.dispatchEvent(new Event("bloomTasksUpdated")); // trigger reactivity
+
+      // Persist to backend (fire-and-forget)
+      apiUpdateBloom(updated).catch((err) =>
+        console.error("Failed to update bloom tasks:", err)
+      );
+
+      // Dispatch event for same-window reactivity
+      window.dispatchEvent(new Event("bloomTasksUpdated"));
+
       return updated;
     });
-  }, [storageKey]);
+  }, []);
 
   return { completedTasks, completeTask };
 };

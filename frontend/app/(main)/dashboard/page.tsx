@@ -8,49 +8,55 @@ import Sidebar from "@/components/layout/Sidebar";
 
 import Overview from "@/components/dashboard/Overview";
 import Progress from "@/components/dashboard/Progress";
-import RadarChartComponent from "@/components/dashboard/RadarChart";
 import SkillGap from "@/components/dashboard/SkillGap";
 import Roadmap from "@/components/dashboard/Roadmap";
-import StreakCard from "@/components/dashboard/StreakCard";
 
+import { useAuth } from "@/context/authContext";
 import { useSkills } from "@/context/skillContext";
 import SkillExplorer from "@/components/skills/SkillExplorer";
 import ResumeBuilder from "@/components/resume/ResumeBuilder";
 import RoadmapGenerator from "@/components/ai/RoadmapGenerator";
 import Insights from "@/components/dashboard/Insights";
 
+import { Loader2 } from "lucide-react";
+
 export default function DashboardPage() {
   const [section, setSection] = useState("overview");
-  const [loading, setLoading] = useState(true);
-
-  const [user, setUser] = useState<any>(null);
-  const [role, setRole] = useState("");
   const [activeSkill, setActiveSkill] = useState("");
 
   const router = useRouter();
+  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
+  const { role } = useSkills();
 
-  const { role: contextRole, onboardingComplete: contextOnboarded } = useSkills();
-
+  // Redirect to login if not authenticated
   useEffect(() => {
-    const token = localStorage.getItem("token");
-
-    if (!token) {
+    if (!authLoading && !isAuthenticated) {
       router.replace("/login");
-      return;
     }
+  }, [authLoading, isAuthenticated, router]);
 
-    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-    
-    setUser(storedUser);
-    setRole(contextRole);
-    setLoading(false);
-  }, [router, contextOnboarded, contextRole]);
+  // Redirect to onboarding if not completed
+  useEffect(() => {
+    if (!authLoading && user && (!user.onboardingCompleted || !user.role)) {
+      router.replace("/onboarding");
+    }
+  }, [authLoading, user, router]);
 
   useEffect(() => {
     setActiveSkill("");
   }, [section]);
 
-  if (loading) return null;
+  // Show loading while auth is hydrating
+  if (authLoading || !user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#fafafa]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 text-pink-500 animate-spin" />
+          <p className="text-sm text-gray-400 font-medium">Loading your workspace...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex bg-[#fafafa] min-h-screen">
@@ -68,7 +74,7 @@ export default function DashboardPage() {
                 Welcome back, {user?.name?.split(' ')[0] || "User"}!
               </h2>
               <p className="text-gray-500 text-sm mt-3 font-medium">
-                You are currently mastering <span className="text-gray-900 font-black underline decoration-pink-500/40 decoration-4 underline-offset-4 transition-all hover:decoration-pink-500">{role || user?.role || "Your Role"}</span>
+                You are currently mastering <span className="text-gray-900 font-black underline decoration-pink-500/40 decoration-4 underline-offset-4 transition-all hover:decoration-pink-500">{role || "Your Role"}</span>
               </p>
             </div>
           )}

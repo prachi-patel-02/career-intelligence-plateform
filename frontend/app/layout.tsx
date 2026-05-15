@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/context/authContext";
 import { SkillProvider } from "@/context/skillContext";
 import { AssessmentProvider } from "@/context/assessmentContext";
 
@@ -30,7 +31,13 @@ export default function RootLayout({
       className={`${inter.variable} ${plusJakartaSans.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans">
-        <SkillProvider><AssessmentProvider>{children}</AssessmentProvider></SkillProvider>
+        <AuthProvider>
+          <SkillProvider>
+            <AssessmentProvider>
+              {children}
+            </AssessmentProvider>
+          </SkillProvider>
+        </AuthProvider>
       </body>
     </html>
   );

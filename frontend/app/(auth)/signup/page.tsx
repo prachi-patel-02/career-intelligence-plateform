@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { API_ENDPOINTS } from "@/lib/apiConfig";
+import { useAuth } from "@/context/authContext";
 
 export default function SignupPage() {
   const router = useRouter();
+  const { signup } = useAuth();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -28,6 +29,7 @@ export default function SignupPage() {
   });
 
   const [apiError, setApiError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validate = (field: string, value: string) => {
     if (field === "name") {
@@ -54,7 +56,7 @@ export default function SignupPage() {
     return "";
   };
 
-  // 👉 ONLY set value (NO validation here)
+  // ONLY set value (NO validation here)
   const handleChange = (field: string, value: string) => {
     if (field === "name") setName(value);
     if (field === "email") setEmail(value);
@@ -62,7 +64,7 @@ export default function SignupPage() {
     if (field === "confirmPassword") setConfirmPassword(value);
   };
 
-  // 👉 Validate when user leaves field
+  // Validate when user leaves field
   const handleBlur = (field: string) => {
     setTouched({ ...touched, [field]: true });
 
@@ -96,56 +98,18 @@ export default function SignupPage() {
     const hasError = Object.values(newErrors).some((e) => e !== "");
     if (hasError) return;
 
+    setIsSubmitting(true);
+
     try {
-      console.log("Attempting signup at:", API_ENDPOINTS.AUTH.SIGNUP);
-      const res = await fetch(API_ENDPOINTS.AUTH.SIGNUP, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name, email, password }),
-      });
-
-      const contentType = res.headers.get("content-type");
-      let data;
-      if (contentType && contentType.includes("application/json")) {
-        data = await res.json();
-      } else {
-        const errorText = await res.text();
-        console.error("❌ Non-JSON Response:", errorText);
-        setApiError("Server error: Received invalid response format.");
-        return;
-      }
-
-      if (!res.ok) {
-        setApiError(data.message || "Signup failed");
-        return;
-      }
-
-      localStorage.setItem("token", data.token || "signed-up");
-
-      localStorage.setItem(
-        "user",
-        JSON.stringify(
-          data.user || {
-            name,
-            email,
-            role: "",
-          }
-        )
-      );
-
-      localStorage.removeItem("isGuest");
-      localStorage.removeItem("role");
-      localStorage.removeItem("isOnboarded");
-      localStorage.removeItem("skills_data");
-
+      await signup(name, email, password);
+      // After signup, always go to onboarding
       router.push("/onboarding");
-    } catch (error) {
-      console.error("Signup Fetch Error:", error);
+    } catch (err: any) {
       setApiError(
-        "Could not connect to the server. Please check your internet or try again later."
+        err.message || "Signup failed. Please try again."
       );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -244,8 +208,11 @@ export default function SignupPage() {
               )}
             </div>
 
-            <button className="w-full bg-linear-to-r from-purple-600 to-pink-500 text-white py-3 rounded-xl font-semibold">
-              Create Account
+            <button
+              disabled={isSubmitting}
+              className="w-full bg-linear-to-r from-purple-600 to-pink-500 text-white py-3 rounded-xl font-semibold disabled:opacity-60"
+            >
+              {isSubmitting ? "Creating Account..." : "Create Account"}
             </button>
           </form>
 

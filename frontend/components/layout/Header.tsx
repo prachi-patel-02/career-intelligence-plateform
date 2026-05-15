@@ -1,7 +1,7 @@
 "use client";
 
 import { LogOut } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/authContext";
 
 type HeaderProps = {
   currentSection: string;
@@ -12,33 +12,24 @@ type HeaderProps = {
 const SECTION_LABELS: Record<string, string> = {
   overview:         "Overview",
   "skill-explorer": "Skill Explorer",
+  "ai-roadmap":     "AI Roadmap",
   progress:         "Progress Tracker",
   "radar-chart":    "Skill Radar",
   streak:           "Streak",
   "skill-gap":      "Skill Gap",
+  insights:         "Insights",
   resume:           "Resume Builder",
 };
 
 export default function Header({ currentSection, user, role }: HeaderProps) {
-  const router = useRouter();
+  const { logout } = useAuth();
 
   const date = new Date().toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric",
   });
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("isGuest");
-    localStorage.removeItem("pendingRole");
-    localStorage.removeItem("pendingSkills");
-
-    // Clear legacy global keys to prevent leakage
-    localStorage.removeItem("role");
-    localStorage.removeItem("skills");
-    localStorage.removeItem("onboardingComplete");
-
-    router.push("/login");
+    logout();
   };
 
   const initials = user?.name

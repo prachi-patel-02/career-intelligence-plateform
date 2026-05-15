@@ -135,9 +135,9 @@ const SkillAssessment: React.FC<SkillAssessmentProps> = ({
   };
 
   const bestScore = getBestScore(skillName);
-  const progressPct =
+  const answeredPct =
     questions.length > 0
-      ? Math.round(((currentIdx + 1) / questions.length) * 100)
+      ? Math.round((answers.filter((a) => a.trim() !== "").length / questions.length) * 100)
       : 0;
   const answeredCount = answers.filter((a) => a.trim() !== "").length;
 
@@ -400,7 +400,7 @@ const SkillAssessment: React.FC<SkillAssessmentProps> = ({
           <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all duration-500"
-              style={{ width: `${progressPct}%` }}
+              style={{ width: `${answeredPct}%` }}
             />
           </div>
         </div>

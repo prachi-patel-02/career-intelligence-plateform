@@ -13,6 +13,8 @@ import {
   AssessmentData,
   AssessmentQuestion,
 } from "@/lib/gemini";
+import { useAuth } from "@/context/authContext";
+import { apiUpdateAssessments } from "@/lib/api";
 
 /* ================= TYPES ================= */
 
@@ -91,108 +93,47 @@ export function AssessmentProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const { user, isLoading: authLoading } = useAuth();
+
   const [tests, setTests] = useState<Record<string, AssessmentData>>({});
   const [results, setResults] = useState<Record<string, SkillResult>>({});
   const [bestScores, setBestScores] = useState<Record<string, number>>({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
 
-  /* ===== DETECT USER ===== */
-
-  useEffect(() => {
-    const getUserId = () => {
-      const userJson = localStorage.getItem("user");
-      if (userJson) {
-        try {
-          const user = JSON.parse(userJson);
-          return user.email || user._id || "unknown";
-        } catch {
-          return "unknown";
-        }
-      }
-      if (localStorage.getItem("isGuest") === "true") return "guest";
-      return null;
-    };
-
-    setUserId(getUserId());
-
-    const interval = setInterval(() => {
-      const currentId = getUserId();
-      if (currentId !== userId) setUserId(currentId);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [userId]);
-
-  /* ===== STORAGE KEYS ===== */
-
-  const getKeys = useCallback(() => {
-    const prefix = userId ? `${userId}_` : "";
-    return {
-      tests: `${prefix}assessmentTests`,
-      results: `${prefix}assessmentResults`,
-      best: `${prefix}assessmentBestScores`,
-    };
-  }, [userId]);
-
-  /* ===== LOAD FROM STORAGE ===== */
+  /* ===== HYDRATE FROM AUTH USER ===== */
 
   useEffect(() => {
-    const keys = getKeys();
-    try {
-      const storedTests = JSON.parse(
-        localStorage.getItem(keys.tests) || "{}"
-      );
-      setTests(storedTests);
-    } catch {
+    if (authLoading) return;
+
+    if (!user) {
       setTests({});
-    }
-    try {
-      const storedResults = JSON.parse(
-        localStorage.getItem(keys.results) || "{}"
-      );
-      setResults(storedResults);
-    } catch {
       setResults({});
-    }
-    try {
-      const storedBest = JSON.parse(
-        localStorage.getItem(keys.best) || "{}"
-      );
-      setBestScores(storedBest);
-    } catch {
       setBestScores({});
+      return;
     }
-  }, [getKeys, userId]);
 
-  /* ===== PERSIST HELPERS ===== */
+    // Load from user's persisted data
+    setTests(user.assessmentTests || {});
+    setResults(user.assessmentResults || {});
+    setBestScores(user.assessmentBestScores || {});
+  }, [user, authLoading]);
 
-  const saveTests = useCallback(
-    (updated: Record<string, AssessmentData>) => {
-      const keys = getKeys();
-      localStorage.setItem(keys.tests, JSON.stringify(updated));
-      setTests(updated);
+  /* ===== PERSIST TO BACKEND ===== */
+
+  const persistAssessments = useCallback(
+    (
+      updatedTests: Record<string, AssessmentData>,
+      updatedResults: Record<string, SkillResult>,
+      updatedBest: Record<string, number>
+    ) => {
+      apiUpdateAssessments({
+        assessmentTests: updatedTests,
+        assessmentResults: updatedResults,
+        assessmentBestScores: updatedBest,
+      }).catch((err) => console.error("Failed to persist assessments:", err));
     },
-    [getKeys]
-  );
-
-  const saveResults = useCallback(
-    (updated: Record<string, SkillResult>) => {
-      const keys = getKeys();
-      localStorage.setItem(keys.results, JSON.stringify(updated));
-      setResults(updated);
-    },
-    [getKeys]
-  );
-
-  const saveBestScores = useCallback(
-    (updated: Record<string, number>) => {
-      const keys = getKeys();
-      localStorage.setItem(keys.best, JSON.stringify(updated));
-      setBestScores(updated);
-    },
-    [getKeys]
+    []
   );
 
   /* ===== GET / GENERATE TEST ===== */
@@ -213,8 +154,12 @@ export function AssessmentProvider({
 
     try {
       const data = await generateSkillAssessment(skillName, roleName);
-      const updated = { ...tests, [skillName]: data };
-      saveTests(updated);
+      const updatedTests = { ...tests, [skillName]: data };
+      setTests(updatedTests);
+
+      // Persist the new test to backend
+      persistAssessments(updatedTests, results, bestScores);
+
       return data;
     } catch (err: any) {
       const msg = err.message || "Failed to generate assessment";
@@ -254,16 +199,20 @@ export function AssessmentProvider({
       correctFlags,
     };
 
-    // Save result
+    // Update results
     const updatedResults = { ...results, [skillName]: result };
-    saveResults(updatedResults);
+    setResults(updatedResults);
 
     // Update best score
     const currentBest = bestScores[skillName] || 0;
+    let updatedBest = bestScores;
     if (percentage > currentBest) {
-      const updatedBest = { ...bestScores, [skillName]: percentage };
-      saveBestScores(updatedBest);
+      updatedBest = { ...bestScores, [skillName]: percentage };
+      setBestScores(updatedBest);
     }
+
+    // Persist all to backend
+    persistAssessments(tests, updatedResults, updatedBest);
 
     return result;
   };
@@ -291,7 +240,10 @@ export function AssessmentProvider({
   const retryTest = (skillName: string) => {
     const updatedResults = { ...results };
     delete updatedResults[skillName];
-    saveResults(updatedResults);
+    setResults(updatedResults);
+
+    // Persist
+    persistAssessments(tests, updatedResults, bestScores);
   };
 
   /* ===== OVERALL PROGRESS ===== */

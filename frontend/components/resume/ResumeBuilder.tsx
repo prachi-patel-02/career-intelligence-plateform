@@ -55,17 +55,25 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ user, role: propRole }) =
       .map(s => s.name)
       .filter(name => !["Basics", "Intermediate", "Advanced"].includes(name));
     
-    // Map tasks to professional bullets
+    // Map tasks to professional bullets, focusing on PROJECTS and INTERVIEW prep
     const completedTasks = contextSkills
       .flatMap(s => s.tasks)
       .filter(t => t.completed)
       .map(t => {
         const title = t.title;
+        const type = t.type;
+        
+        if (type === 'project') return `Built ${title}: ${t.description || "A practical implementation of technical skills"}`;
+        if (type === 'interview') return `Mastered technical interview concepts for ${t.stage}: ${title}`;
+        if (t.resumeReady) return title;
+        
         if (title.toLowerCase().includes("basics")) return `Mastered fundamental concepts and architecture of ${resumeData.role}`;
         if (title.toLowerCase().includes("intermediate")) return `Developed scalable application features and structured components`;
         if (title.toLowerCase().includes("advanced")) return `Optimized performance and implemented advanced architectural patterns`;
-        return title;
-      });
+        
+        return null;
+      })
+      .filter(Boolean) as string[];
 
     if (completedSkills.length > 0 || completedTasks.length > 0) {
       setResumeData(prev => {

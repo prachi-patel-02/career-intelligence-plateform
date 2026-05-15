@@ -7,6 +7,7 @@ const connectDB = require("./config/db");
 
 // routes
 const authRoutes = require("./routes/authRoutes");
+const userRoutes = require("./routes/userRoutes");
 
 // create app
 const app = express();
@@ -16,11 +17,11 @@ connectDB();
 
 // middleware
 app.use(cors({
-  origin: "*", // In production, you might want to specify your Vercel URL here
+  origin: "*",
   methods: ["GET", "POST", "PUT", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -30,6 +31,7 @@ app.use((req, res, next) => {
 
 // routes
 app.use("/api/auth", authRoutes);
+app.use("/api/user", userRoutes);
 
 // health check
 app.get("/api/health", (req, res) => {

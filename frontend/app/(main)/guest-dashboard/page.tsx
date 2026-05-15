@@ -6,21 +6,21 @@ import { ROLE_SKILLS } from "@/lib/roles";
 import {
   BookOpen,
   CheckCircle,
-  XCircle,
   ClipboardList,
-  Eye,
   Lock,
   ExternalLink,
   Star,
-  LogIn,
+  Sparkles,
+  ArrowRight,
+  Zap,
+  ChevronRight,
+  Play,
 } from "lucide-react";
 import Image from "next/image";
-import { useSkills } from "@/context/skillContext";
-import { API_ENDPOINTS } from "@/lib/apiConfig";
+import { generateRoadmap } from "@/lib/gemini";
 
 function GuestDashboard() {
   const router = useRouter();
-  const { role: contextRole } = useSkills();
 
   const [role, setRole] = useState("");
   const [activeSkill, setActiveSkill] = useState<string | null>(null);
@@ -41,297 +41,436 @@ function GuestDashboard() {
     }
 
     const savedRole = localStorage.getItem("role_guest");
-    console.log("role_guest:", savedRole);
-    console.log("isGuest:", localStorage.getItem("isGuest"));
-
     if (!savedRole) {
       router.push("/onboarding");
       return;
     }
-
     setRole(savedRole);
   }, [router]);
 
+  // Calls Gemini directly — no backend route needed for guests
   const fetchRoadmap = async (skill: string) => {
     setLoading(true);
     setRoadmap(null);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-
     try {
-      console.log("Guest fetching roadmap from:", API_ENDPOINTS.ROADMAP.GENERATE);
-      const res = await fetch(API_ENDPOINTS.ROADMAP.GENERATE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, skill }),
-        signal: controller.signal,
-      });
-
-      const data = await res.json();
-      console.log("🔓 Guest Roadmap Data:", data);
-      setRoadmap(data.roadmap);
+      const data = await generateRoadmap(skill, role || "Professional");
+      setRoadmap(data);
     } catch (err: any) {
-      if (err.name === "AbortError") {
-        console.error("Roadmap request timed out (8s)");
-      } else {
-        console.error("Error fetching roadmap:", err);
-      }
+      console.error("Error fetching guest roadmap:", err);
     } finally {
-      clearTimeout(timeoutId);
       setLoading(false);
     }
   };
 
   if (!role) {
     return (
-      <div className="min-h-screen bg-pink-50/30 flex items-center justify-center">
-        <div className="animate-pulse text-gray-400 font-medium">
-          Loading...
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 border-4 border-pink-200 border-t-pink-500 rounded-full animate-spin"></div>
+          <p className="text-sm text-gray-400 font-medium">
+            Preparing your experience...
+          </p>
         </div>
       </div>
     );
   }
 
   const requiredSkills = ROLE_SKILLS[role as keyof typeof ROLE_SKILLS] || [];
-
-  // Flatten stages for guest preview
   const displaySteps = roadmap?.stages
-    ? roadmap.stages.flatMap((s: any) =>
-        s.topics.map((t: any) => ({ ...t, stage: s.level })),
+    ? roadmap.stages.flatMap(
+        (s: any) =>
+          s.topics?.map((t: any) => ({ ...t, stage: s.level })) ||
+          s.items?.map((t: any) => ({ ...t, stage: s.title })) ||
+          [],
       )
     : roadmap?.steps || [];
-
   const totalModules = requiredSkills.length * 8;
 
   return (
-    <div className="min-h-screen bg-pink-50/30">
-      {/* ─── HEADER / LOGO ─── */}
-      <div className="flex flex-col items-center pt-10 pb-4">
-        <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-md mb-3">
-          <Image
-            src="/career-intelligence.png"
-            alt="Career Intelligence"
-            width={56}
-            height={56}
-            className="object-contain"
-          />
-        </div>
-        <h2 className="text-lg font-extrabold text-gray-900 tracking-tight">
-          Career Intelligence
-        </h2>
-        <p className="text-[10px] font-bold text-pink-500 uppercase tracking-[0.2em] mt-0.5">
-          Guest Experience
-        </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-pink-50/30">
+      {/* Background Orbs */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-pink-100/20 rounded-full blur-3xl translate-x-1/2 -translate-y-1/2"></div>
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-100/20 rounded-full blur-3xl -translate-x-1/2 translate-y-1/2"></div>
       </div>
 
-      {/* ─── HERO SECTION ─── */}
-      <div className="text-center px-6 pb-10">
-        <div className="inline-flex items-center gap-2 bg-pink-100/60 px-4 py-1.5 rounded-full mb-6">
-          <span className="text-sm">🎯</span>
-          <span className="text-[10px] font-bold text-pink-600 uppercase tracking-wider">
-            Previewing your personalized journey
+      {/* ─── NAVBAR ─── */}
+      <nav className="relative z-10 flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl overflow-hidden shadow-sm border border-pink-100">
+            <Image
+              src="/career-intelligence.png"
+              alt="CI"
+              width={36}
+              height={36}
+              className="object-contain"
+            />
+          </div>
+          <div>
+            <p className="text-sm font-black text-gray-900 leading-none">
+              Career Intelligence
+            </p>
+            <p className="text-[9px] font-bold text-pink-500 uppercase tracking-widest">
+              Guest Mode
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => router.push("/login")}
+          className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white text-xs font-black rounded-xl hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-95"
+        >
+          Sign In Free <ArrowRight size={13} strokeWidth={3} />
+        </button>
+      </nav>
+
+      {/* ─── HERO ─── */}
+      <div className="relative z-10 text-center px-6 pt-12 pb-16">
+        <div className="inline-flex items-center gap-2 bg-white border border-pink-100 shadow-sm px-4 py-2 rounded-full mb-8">
+          <div className="w-2 h-2 bg-pink-500 rounded-full animate-pulse"></div>
+          <span className="text-[11px] font-black text-pink-600 uppercase tracking-widest">
+            Personalized Preview for {role}
           </span>
         </div>
 
-        <h1 className="text-4xl md:text-5xl font-black text-gray-900 tracking-tight leading-tight mb-4">
+        <h1 className="text-5xl md:text-6xl font-black text-gray-900 tracking-tight leading-[1.1] mb-5">
           Master{" "}
-          <span className="bg-linear-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
-            {role}
+          <span className="relative">
+            <span className="bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
+              {role}
+            </span>
+            <span className="absolute -bottom-1 left-0 w-full h-1 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full opacity-40"></span>
           </span>
           <br />
-          Expertly.
+          <span className="text-gray-400 font-black">like a Pro.</span>
         </h1>
 
-        <p className="text-gray-500 text-sm max-w-lg mx-auto leading-relaxed mb-8">
-          We&apos;ve analyzed your goals and built this custom roadmap. Join
-          10,000+ builders tracking their growth in real-time.
+        <p className="text-gray-500 text-base max-w-md mx-auto leading-relaxed mb-8 font-medium">
+          AI-generated curriculum tailored to your goal. Join 10,000+ developers
+          tracking their growth.
         </p>
 
-        <div className="flex items-center justify-center gap-4">
+        <div className="flex items-center justify-center gap-3 flex-wrap">
           <button
             onClick={() => {
               const el = document.getElementById("curriculum-section");
               el?.scrollIntoView({ behavior: "smooth" });
             }}
-            className="px-6 py-3 bg-linear-to-r from-gray-900 to-gray-800 text-white text-sm font-bold rounded-full shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2"
+            className="flex items-center gap-2 px-7 py-3.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-sm font-black rounded-2xl shadow-xl shadow-pink-200 hover:shadow-2xl hover:-translate-y-0.5 transition-all active:scale-95"
           >
-            Start Learning Now <ExternalLink size={14} />
+            <Play size={14} fill="white" /> Explore Roadmap
           </button>
           <button
             onClick={() => router.push("/login")}
-            className="px-6 py-3 border-2 border-gray-200 text-gray-600 text-sm font-bold rounded-full hover:border-gray-400 transition-all"
+            className="flex items-center gap-2 px-7 py-3.5 bg-white border-2 border-gray-100 text-gray-700 text-sm font-black rounded-2xl hover:border-gray-200 hover:bg-gray-50 transition-all active:scale-95 shadow-sm"
           >
-            View All Features
+            View Full Access <ExternalLink size={13} />
           </button>
+        </div>
+
+        {/* Stats Row */}
+        <div className="flex items-center justify-center gap-8 mt-12">
+          {[
+            { val: totalModules + "+", label: "Total Modules" },
+            { val: requiredSkills.length + "", label: "Core Skills" },
+            { val: "AI", label: "Powered Path" },
+          ].map((stat, i) => (
+            <div key={i} className="text-center">
+              <p className="text-2xl font-black text-gray-900">{stat.val}</p>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                {stat.label}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* ─── MAIN CONTENT — 2 COLUMN GRID ─── */}
-      <div id="curriculum-section" className="max-w-5xl mx-auto px-6 pb-16">
+      {/* ─── MAIN CONTENT ─── */}
+      <div
+        id="curriculum-section"
+        className="relative z-10 max-w-6xl mx-auto px-6 pb-20"
+      >
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* ── LEFT: Curriculum Roadmap (3 cols) ── */}
-          <div className="lg:col-span-3 bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">
-                  Curriculum Roadmap
-                </h3>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">
-                  Locked preview for {role}
-                </p>
-              </div>
-              <span className="px-3 py-1 bg-pink-50 text-pink-600 text-[10px] font-bold uppercase tracking-wider rounded-full border border-pink-100">
-                Action Required
-              </span>
-            </div>
-
-            {/* Skills List */}
-            <div className="space-y-3">
-              {requiredSkills.slice(0, 5).map((skill) => (
-                <button
-                  key={skill}
-                  onClick={() => {
-                    setActiveSkill(skill);
-                    fetchRoadmap(skill);
-                  }}
-                  className="w-full flex items-center justify-between p-4 bg-gray-50/80 rounded-2xl border border-gray-100 hover:border-pink-200 hover:bg-pink-50/30 transition-all group"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-9 h-9 bg-white rounded-xl border border-gray-100 flex items-center justify-center text-pink-400 group-hover:text-pink-600 group-hover:border-pink-200 transition-colors shadow-sm">
-                      <Lock size={16} />
-                    </div>
-                    <span className="font-bold text-gray-800 text-sm">
-                      {skill}
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-medium text-gray-400">
-                    8 modules
+          {/* ── LEFT: Curriculum Panel ── */}
+          <div className="lg:col-span-3 space-y-5">
+            {/* Header Card */}
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-7">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-black text-gray-900 tracking-tight">
+                    Curriculum Roadmap
+                  </h3>
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
+                    Preview for {role}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-600 border border-amber-100 rounded-xl">
+                  <Lock size={11} strokeWidth={3} />
+                  <span className="text-[10px] font-black uppercase tracking-wider">
+                    Locked
                   </span>
-                </button>
-              ))}
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                {requiredSkills.slice(0, 6).map((skill, i) => {
+                  const isActive = activeSkill === skill;
+                  return (
+                    <button
+                      key={skill}
+                      onClick={() => {
+                        setActiveSkill(skill);
+                        fetchRoadmap(skill);
+                      }}
+                      className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all duration-300 group text-left ${
+                        isActive
+                          ? "border-pink-200 bg-pink-50/50 shadow-sm"
+                          : "border-gray-100 hover:border-pink-100 hover:bg-pink-50/20"
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-[12px] transition-all ${
+                            isActive
+                              ? "bg-pink-500 text-white shadow-lg shadow-pink-200"
+                              : "bg-gray-100 text-gray-500 group-hover:bg-pink-100 group-hover:text-pink-600"
+                          }`}
+                        >
+                          {i + 1}
+                        </div>
+                        <div>
+                          <span
+                            className={`font-black text-sm block ${isActive ? "text-pink-700" : "text-gray-800"}`}
+                          >
+                            {skill}
+                          </span>
+                          <span className="text-[10px] text-gray-400 font-medium">
+                            8 modules
+                          </span>
+                        </div>
+                      </div>
+                      <ChevronRight
+                        size={14}
+                        className={`transition-all ${isActive ? "text-pink-400 translate-x-1" : "text-gray-300 group-hover:text-gray-400"}`}
+                        strokeWidth={3}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Roadmap Preview (when a skill is clicked) */}
+            {/* Roadmap Preview Card */}
             {activeSkill && (
-              <div className="mt-6 p-5 bg-purple-50/50 rounded-2xl border border-purple-100 animate-in fade-in slide-in-from-top-2 duration-300">
-                <h4 className="font-bold text-purple-800 text-sm mb-3 flex items-center gap-2">
-                  <BookOpen size={16} />
-                  {activeSkill} — Preview
-                </h4>
-                {loading ? (
-                  <div className="flex items-center gap-2 text-gray-500 text-sm">
-                    <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
-                    Generating roadmap preview...
+              <div className="bg-white rounded-3xl border border-purple-100 shadow-sm p-7 animate-in fade-in slide-in-from-top-3 duration-400">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600">
+                    <BookOpen size={18} />
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    {displaySteps.length > 0 ? (
-                      displaySteps.slice(0, 2).map((step: any, i: number) => (
-                        <div
-                          key={i}
-                          className="p-3 bg-white rounded-xl border border-purple-100"
-                        >
-                          <p className="font-bold text-purple-700 text-sm">
-                            {step.stage || "Stage"}: {step.name}
+                  <div>
+                    <h4 className="font-black text-gray-900 text-sm">
+                      {activeSkill} — Preview
+                    </h4>
+                    <p className="text-[10px] text-purple-500 font-bold uppercase tracking-widest">
+                      AI Generated Path
+                    </p>
+                  </div>
+                </div>
+
+                {loading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 animate-pulse"
+                      >
+                        <div className="w-9 h-9 bg-gray-200 rounded-xl flex-shrink-0"></div>
+                        <div className="flex-1 space-y-2">
+                          <div className="h-3 bg-gray-200 rounded-full w-2/3"></div>
+                          <div className="h-2 bg-gray-100 rounded-full w-full"></div>
+                        </div>
+                      </div>
+                    ))}
+                    <p className="text-center text-xs text-gray-400 font-medium pt-2">
+                      Generating your roadmap...
+                    </p>
+                  </div>
+                ) : displaySteps.length > 0 ? (
+                  <div className="space-y-3">
+                    {displaySteps.slice(0, 4).map((step: any, i: number) => (
+                      <div
+                        key={i}
+                        className="flex items-start gap-3 p-4 rounded-2xl bg-purple-50/40 border border-purple-50"
+                      >
+                        <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600 flex-shrink-0 text-xs font-black">
+                          {i + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-black text-gray-900 text-sm leading-tight">
+                            {step.name || step.title}
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-[11px] text-gray-400 font-medium mt-0.5 line-clamp-1">
                             {step.description ||
                               (step.subtopics
-                                ? step.subtopics.slice(0, 3).join(", ")
+                                ? step.subtopics.slice(0, 2).join(", ")
                                 : "")}
                           </p>
                         </div>
-                      ))
-                    ) : (
-                      <p className="text-gray-500 text-sm italic">
-                        No roadmap available
+                        <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                          <Lock size={9} className="text-gray-400" />
+                        </div>
+                      </div>
+                    ))}
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-100 text-center">
+                      <p className="text-xs text-gray-500 font-medium mb-2">
+                        +{Math.max(0, displaySteps.length - 4)} more topics
+                        locked
                       </p>
-                    )}
+                      <button
+                        onClick={() => router.push("/login")}
+                        className="text-xs font-black text-pink-600 hover:text-pink-700 flex items-center gap-1 mx-auto"
+                      >
+                        Unlock Full Roadmap{" "}
+                        <ArrowRight size={12} strokeWidth={3} />
+                      </button>
+                    </div>
                   </div>
+                ) : (
+                  <p className="text-gray-400 text-sm text-center py-4 font-medium">
+                    No preview available
+                  </p>
                 )}
               </div>
             )}
 
-            {/* Bottom CTA */}
-            <div className="mt-8 pt-6 border-t border-gray-100">
-              <p className="text-xs text-gray-400 mb-3">
-                Unlock all {totalModules} modules and start tracking your
-                progress today.
-              </p>
-              <button
-                onClick={() => router.push("/login")}
-                className="text-sm font-black text-transparent bg-linear-to-r from-pink-500 to-purple-600 bg-clip-text uppercase tracking-wider flex items-center gap-1 hover:gap-2 transition-all"
-              >
-                Reveal Entire Roadmap{" "}
-                <ExternalLink size={14} className="text-pink-500" />
-              </button>
+            {/* CTA Banner */}
+            <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-3xl p-7 shadow-xl">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-white font-black text-lg tracking-tight leading-tight">
+                    Unlock all {totalModules} modules.
+                  </p>
+                  <p className="text-gray-400 text-xs font-medium mt-1">
+                    Track progress, get AI feedback, earn certificates.
+                  </p>
+                </div>
+                <button
+                  onClick={() => router.push("/login")}
+                  className="flex-shrink-0 px-5 py-3 bg-white text-gray-900 font-black text-xs rounded-2xl hover:bg-gray-100 transition-all active:scale-95 flex items-center gap-2 shadow-lg"
+                >
+                  Get Started <ArrowRight size={13} strokeWidth={3} />
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* ── RIGHT COLUMN (2 cols) ── */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* AI-Powered Tutor */}
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
-              <div className="w-12 h-12 bg-linear-to-br from-purple-600 to-pink-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-purple-200 mb-5">
-                <Star size={22} />
-              </div>
-              <h3 className="text-lg font-extrabold text-gray-900 tracking-tight mb-2">
-                AI-Powered Tutor
-              </h3>
-              <p className="text-sm text-gray-500 leading-relaxed mb-4">
-                Get real-time feedback, concept breakdowns, and project ideas
-                tailored to your skill level.
-              </p>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-full border border-gray-100">
-                <Lock size={12} className="text-gray-400" />
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Premium Access Only
-                </span>
+          {/* ── RIGHT COLUMN ── */}
+          <div className="lg:col-span-2 space-y-5">
+            {/* AI Tutor Card */}
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-50 to-pink-50 rounded-bl-[4rem] -z-0"></div>
+              <div className="relative z-10">
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-purple-200 mb-5">
+                  <Sparkles size={22} />
+                </div>
+                <h3 className="text-base font-black text-gray-900 tracking-tight mb-2">
+                  AI-Powered Tutor
+                </h3>
+                <p className="text-sm text-gray-500 leading-relaxed mb-5">
+                  Real-time feedback, concept breakdowns, and project ideas
+                  tailored to your skill level.
+                </p>
+                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-100 w-fit">
+                  <Lock size={11} className="text-gray-400" strokeWidth={3} />
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                    Premium Only
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Small Cards: Certificates + Community */}
+            {/* Feature Cards Row */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 text-center">
-                <div className="w-10 h-10 bg-pink-50 rounded-xl flex items-center justify-center text-pink-500 mx-auto mb-3">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 text-center group hover:border-pink-100 transition-all">
+                <div className="w-11 h-11 bg-pink-50 rounded-xl flex items-center justify-center text-pink-500 mx-auto mb-3 group-hover:scale-110 transition-transform">
                   <CheckCircle size={20} />
                 </div>
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
                   Verified
                 </p>
-                <p className="text-sm font-extrabold text-gray-900">
-                  Certificates
-                </p>
+                <p className="text-sm font-black text-gray-900">Certificates</p>
               </div>
 
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 text-center">
-                <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-purple-500 mx-auto mb-3">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 text-center group hover:border-purple-100 transition-all">
+                <div className="w-11 h-11 bg-purple-50 rounded-xl flex items-center justify-center text-purple-500 mx-auto mb-3 group-hover:scale-110 transition-transform">
                   <ClipboardList size={20} />
                 </div>
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
                   Social
                 </p>
-                <p className="text-sm font-extrabold text-gray-900">
-                  Community
-                </p>
+                <p className="text-sm font-black text-gray-900">Community</p>
               </div>
             </div>
 
-            {/* Final Dark CTA */}
-            <div className="bg-linear-to-br from-gray-900 to-gray-800 rounded-3xl p-7 text-white shadow-xl">
-              <h3 className="text-xl font-extrabold tracking-tight mb-2">
-                Start your journey today.
-              </h3>
-              <p className="text-sm text-gray-400 leading-relaxed mb-5">
-                Save your progress, unlock all roadmap modules, and access your
-                personal AI Tutor.
-              </p>
+            {/* Progress Teaser */}
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-500">
+                  <Zap size={18} />
+                </div>
+                <div>
+                  <p className="font-black text-sm text-gray-900">
+                    Your Progress
+                  </p>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                    Sign up to track
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {requiredSkills.slice(0, 3).map((skill, i) => (
+                  <div key={skill} className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="font-bold text-gray-600">{skill}</span>
+                      <span className="font-black text-gray-400">Locked</span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-pink-300 to-purple-300 rounded-full w-0 animate-pulse"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
               <button
                 onClick={() => router.push("/login")}
-                className="w-full py-3 bg-white text-gray-900 font-bold text-sm rounded-xl hover:bg-gray-100 transition-all flex items-center justify-center gap-2"
+                className="w-full mt-5 py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-black text-xs rounded-2xl shadow-lg shadow-pink-100 hover:shadow-xl hover:-translate-y-0.5 transition-all active:scale-95 flex items-center justify-center gap-2"
               >
-                Create Free Account <ExternalLink size={14} />
+                <Star size={14} /> Unlock Full Access
               </button>
+            </div>
+
+            {/* Social Proof */}
+            <div className="bg-gradient-to-br from-pink-50 to-purple-50 rounded-3xl border border-pink-100 p-6 text-center">
+              <p className="text-3xl font-black text-gray-900 mb-1">10,000+</p>
+              <p className="text-xs text-gray-500 font-medium">
+                developers already on their path
+              </p>
+              <div className="flex -space-x-2 justify-center mt-4">
+                {["#f9a8d4", "#c084fc", "#93c5fd", "#6ee7b7", "#fcd34d"].map(
+                  (color, i) => (
+                    <div
+                      key={i}
+                      className="w-8 h-8 rounded-full border-2 border-white shadow-sm"
+                      style={{ backgroundColor: color }}
+                    ></div>
+                  ),
+                )}
+                <div className="w-8 h-8 rounded-full border-2 border-white shadow-sm bg-gray-100 flex items-center justify-center">
+                  <span className="text-[8px] font-black text-gray-500">
+                    +k
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

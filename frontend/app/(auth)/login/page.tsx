@@ -3,10 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { API_ENDPOINTS } from "@/lib/apiConfig";
+import { useAuth } from "@/context/authContext";
+import { useSkills } from "@/context/skillContext";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
+  const { setSkillsFromRole } = useSkills();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,6 +20,7 @@ export default function LoginPage() {
   });
 
   const [apiError, setApiError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validate = (field: string, value: string) => {
     if (field === "email") {
@@ -64,46 +68,46 @@ export default function LoginPage() {
 
     if (Object.values(newErrors).some((e) => e !== "")) return;
 
+    setIsSubmitting(true);
+
     try {
-      console.log("Attempting login at:", API_ENDPOINTS.AUTH.LOGIN);
-      const res = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
+      const user = await login(email, password);
 
-      const data = await res.json();
+      // ─── Flow Connection Logic ───
+      // If user came from "Continue with Account" (pendingRole)
+      // OR they were a guest who decided to login (role_guest)
+      const pendingRole = localStorage.getItem("pendingRole");
+      const pendingSkills = localStorage.getItem("pendingSkills");
+      const roleGuest = localStorage.getItem("role_guest");
 
-      if (!res.ok) {
-        setApiError(data.message || "Login failed. Please check your credentials.");
-        return;
+      const roleToUse = pendingRole || roleGuest;
+
+      if (roleToUse && (!user.onboardingCompleted || !user.role)) {
+        const skills = pendingSkills ? JSON.parse(pendingSkills) : [];
+        await setSkillsFromRole(roleToUse, skills);
+        
+        // Clean up pending state
+        localStorage.removeItem("pendingRole");
+        localStorage.removeItem("pendingSkills");
       }
 
-      const token = data.token ? data.token : "temp-token";
-      localStorage.setItem("token", token);
-
-      const existingUser = JSON.parse(localStorage.getItem("user") || "{}");
-      const savedUser = {
-        ...existingUser,
-        ...data.user,
-      };
-
-      localStorage.setItem("user", JSON.stringify(savedUser));
-
-      // Remove guest flags
+      // Clear all guest/temporary state on successful login
       localStorage.removeItem("isGuest");
-      localStorage.removeItem("role");
-      localStorage.removeItem("isOnboarded");
-      localStorage.removeItem("skills_data");
+      localStorage.removeItem("role_guest");
 
-      router.push("/dashboard");
-    } catch (err) {
-      console.error("Login Fetch Error:", err);
+      // Redirect to main dashboard directly if we have a role now
+      if (roleToUse || (user.onboardingCompleted && user.role)) {
+        router.push("/dashboard");
+      } else {
+        // Only go to onboarding if user still has no role selected
+        router.push("/onboarding");
+      }
+    } catch (err: any) {
       setApiError(
-        "Could not connect to the server. Please check your internet or try again later."
+        err.message || "Login failed. Please check your credentials."
       );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -162,13 +166,16 @@ export default function LoginPage() {
               )}
             </div>
 
-            <button className="w-full bg-linear-to-r from-purple-600 to-pink-500 text-white py-3 rounded-xl font-semibold">
-              Login
+            <button
+              disabled={isSubmitting}
+              className="w-full bg-linear-to-r from-purple-600 to-pink-500 text-white py-3 rounded-xl font-semibold disabled:opacity-60"
+            >
+              {isSubmitting ? "Logging in..." : "Login"}
             </button>
           </form>
 
           <p className="text-center text-sm text-gray-500 mt-6">
-            Don’t have an account?{" "}
+            Don't have an account?{" "}
             <span
               onClick={() => router.push("/signup")}
               className="text-purple-600 font-semibold cursor-pointer"
